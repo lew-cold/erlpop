@@ -29,8 +29,16 @@
 %%%---------------------------------------------------------------------
 
 -vc('$Id$ ').
--export([connect/2,connect/3,stat/1,scan/1,scan/2,retrieve/2,bin_retrieve/2,delete/2,
-	 reset/1,quit/1,uidl/1,uidl/2,top/3]).
+-export([
+    connect/2, connect/3, connect/4,
+    stat/1, scan/1, scan/2,
+    retrieve/2, bin_retrieve/2,
+    delete/2,
+	reset/1,
+    quit/1,
+    uidl/1,uidl/2,
+    top/3]).
+
 -export([notify/3,accept/2,accept/3]).
 
 -import(error_logger,[error_msg/1]).
@@ -87,27 +95,32 @@ connect(User,Passwd) ->
 connect(User,Passwd,Options) when is_atom(User) ->
     connect(atom_to_list(User),Passwd,Options);
 connect(User,Passwd,Options) when is_list(User), is_list(Passwd), is_list(Options) ->
-    catch do_connect(User,Passwd,Options).
+    connect(User, Passwd, Options, 10000).
 
-do_connect(User,Passwd,Options) when is_list(User), is_list(Passwd), is_list(Options) ->
-    S = init_session(User,Options),
-    case do_connect_proto(S) of
+connect(User, Passwd, Options, Timeout) ->
+    catch do_connect(User, Passwd, Options, Timeout).
+
+do_connect(User, Passwd, Options, Timeout) when is_list(User), is_list(Passwd), is_list(Options) ->
+    S = init_session(User, Options),
+    case do_connect_proto(S, Timeout) of
         {ok,Sock} -> get_greeting(S#sk{sockfd=Sock},Passwd);
         _         -> {error,connect_failed}
     end.
 
-do_connect_proto(S) ->
+do_connect_proto(S, Timeout) ->
+
     case S#sk.ssl of
         false ->
             %% default POP3
             Opts = [{packet,raw}, {reuseaddr,true}, {active,false}],
-            gen_tcp:connect(S#sk.addr, S#sk.port, Opts);
+            gen_tcp:connect(S#sk.addr, S#sk.port, Opts, Timeout);
         true ->
             %% handle POP3 over SSL
 %            application:start(ssl),
 			ssl:start(),
+
             Opts = [{packet,raw}, {reuseaddr,true}, {active,false}],
-            ssl:connect(S#sk.addr, S#sk.port, Opts)
+            ssl:connect(S#sk.addr, S#sk.port, Opts, Timeout)
     end.
 
 %% -----------------------------------------------
@@ -230,19 +243,19 @@ scan_recv(SockFd,false) -> recv_sl(SockFd).
 %% Get specified mail
 %% ------------------
 
-retrieve(S,MsgNum) when is_integer(MsgNum) -> 
+retrieve(S,MsgNum) when is_integer(MsgNum) ->
     Msg = "RETR " ++ integer_to_list(MsgNum),
     deliver(S,Msg),
     if_snoop(S,client,Msg),
     get_retrieve(S).
 
-bin_retrieve(S,MsgNum) when is_integer(MsgNum) -> 
+bin_retrieve(S,MsgNum) when is_integer(MsgNum) ->
     Msg = "RETR " ++ integer_to_list(MsgNum),
     deliver(S,Msg),
     if_snoop(S,client,Msg),
     bin_get_retrieve(S).
 
-top(S,MsgNum,Lines) when is_integer(MsgNum), is_integer(Lines) -> 
+top(S,MsgNum,Lines) when is_integer(MsgNum), is_integer(Lines) ->
     Msg = "TOP " ++ integer_to_list(MsgNum) ++ " " ++ integer_to_list(Lines),
     deliver(S,Msg),
     if_snoop(S,client,Msg),
@@ -282,7 +295,7 @@ bin_get_retrieve(S) ->
 	    Else
     end.
 
-get_line(Str) -> 
+get_line(Str) ->
     F = fun($\n) -> false;
 	   (_)   -> true
 	end,
@@ -354,8 +367,8 @@ delete(S,MsgNum) when is_integer(MsgNum) ->
 %% --------------------------------------------
 %% Remove all delete marks made in this session
 %% --------------------------------------------
-    
-reset(S) -> 
+
+reset(S) ->
     Msg = "RSET",
     deliver(S,Msg),
     if_snoop(S,client,Msg),
@@ -368,7 +381,7 @@ reset(S) ->
 %% Quit the session
 %% ----------------
 
-quit(S) -> 
+quit(S) ->
     Msg = "QUIT",
     deliver(S,Msg),
     if_snoop(S,client,Msg),
@@ -408,7 +421,7 @@ get_ok(S) ->
 	    if_snoop(S,sender,"+ERR" ++ T),
 	    {error,T}
     end.
-    
+
 
 %% -----------------------------
 %% Send a CRLF terminated string
@@ -451,7 +464,7 @@ make_uid_address(L) -> make_uid_address(L, "").
 
 make_uid_address([_Uid, Adr], Uid) -> {Uid++_Uid, Adr};
 make_uid_address([_Uid|L], Uid)    -> make_uid_address(L, Uid++_Uid++"@").
-    
+
 
 set_options([{snoop,Flag}|T],S) ->
     set_options(T,S#sk{snoop=Flag});
