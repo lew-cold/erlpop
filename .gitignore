@@ -2,3 +2,5 @@
 ebin/*.app
 .eunit/
 *~
+_build
+TEST-*
