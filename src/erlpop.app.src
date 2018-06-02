@@ -9,6 +9,8 @@
                   epipe
                   % Optionally: ssl if SSL support is needed.
                  ]},
-  {env, []}
+  {env, []},
+  {maintainers, ["Oleg Tarasenko"]},
+  {licenses, ["Apache 2.0"]},
+  {links, [{"Github & Docs", "https://github.com/oltarasenko/erlpop"}]}
  ]}.
-
