@@ -54,9 +54,9 @@ connect(User, Passwd, Options, Timeout) ->
         {error, Step, Reason, _State} ->
             error_logger:error_msg("Failed to establish connection. Reason: ~p", [Step]),
             {error, Reason};
-        {ok, Conn} = Success -> Success
+        {ok, _Conn} = Success -> Success
     end.
-    
+
 
 build_connection_record(User, Passwd, Options, Timeout) ->
     Addr = proplists:get_value(addr, Options),
@@ -145,7 +145,7 @@ retrieve(Connection, MsgNum) when is_binary(MsgNum) ->
         {ok, <<"-ERR ", Error/binary>>} -> {error, Error};
         Error                           -> {error, Error}
     end;
-retrieve(_Connection, MsgNum) -> {error, badarg}.
+retrieve(_Connection, _MsgNum) -> {error, badarg}.
 
 
 % Quit
@@ -156,9 +156,9 @@ quit(Connection = #connection{protocol = Protocol}) ->
     send(Connection, <<"QUIT">>),
 
     case recv(Connection) of
-        {ok, <<"-ERR ", Error/binary>>} -> 
+        {ok, <<"-ERR ", Error/binary>>} ->
             {error, Error};
-        {ok, <<"+OK">>} -> 
+        {ok, <<"+OK">>} ->
             Protocol:close(),
             ok;
         Err -> {error, Err}
@@ -173,12 +173,12 @@ delete(Connection, MsgNum) when is_binary(MsgNum) ->
     send(Connection, <<"DELE ", MsgNum/binary>>),
 
     case recv(Connection) of
-        {ok, <<"+OK ", Data/binary>>} -> ok;
+        {ok, <<"+OK ", _Data/binary>>} -> ok;
         {ok, <<"-ERR ", Err/binary>>} -> {error, Err};
         Error                         -> {error, Error}
     end;
-delete(_Connection, MsgNum) -> {error, badarg}.
-    
+delete(_Connection, _MsgNum) -> {error, badarg}.
+
 
 % Utils functions
 

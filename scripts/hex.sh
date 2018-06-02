@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-
+echo "Pushing to hex"
 set -x
 ## Setup hex user
 mkdir -p ~/.hex
