@@ -1,7 +1,7 @@
 {application, erlpop,
  [
   {description, "POP3 client for Erlang with SSL support"},
-  {vsn, "2.0"},
+  {vsn, "2.0.0"},
   {registered, []},
   {applications, [kernel,
                   stdlib,
@@ -10,6 +10,7 @@
                   % Optionally: ssl if SSL support is needed.
                  ]},
   {env, []},
+  {modules, []},
   {maintainers, ["Oleg Tarasenko"]},
   {licenses, ["Apache 2.0"]},
   {links, [{"Github & Docs", "https://github.com/oltarasenko/erlpop"}]}
