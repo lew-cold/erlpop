@@ -155,14 +155,15 @@ retrieve(_Connection, _MsgNum) -> {error, badarg}.
 quit(Connection = #connection{protocol = Protocol}) ->
     send(Connection, <<"QUIT">>),
 
-    case recv(Connection) of
+    Resp = case recv(Connection) of
         {ok, <<"-ERR ", Error/binary>>} ->
             {error, Error};
         {ok, <<"+OK">>} ->
-            Protocol:close(),
             ok;
         Err -> {error, Err}
-    end.
+    end,
+    Protocol:close(),
+    Resp.
 
 % Delete
 -spec delete(Connection, MsgNum) -> Result when
