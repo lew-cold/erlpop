@@ -152,7 +152,7 @@ retrieve(_Connection, _MsgNum) -> {error, badarg}.
 -spec quit(Connection) -> Result when
     Connection :: connection(),
     Result     :: ok | {error, term()}.
-quit(Connection = #connection{protocol = Protocol}) ->
+quit(Connection = #connection{protocol = Protocol, socket = Socket}) ->
     send(Connection, <<"QUIT">>),
 
     Resp = case recv(Connection) of
@@ -162,7 +162,7 @@ quit(Connection = #connection{protocol = Protocol}) ->
             ok;
         Err -> {error, Err}
     end,
-    Protocol:close(),
+    Protocol:close(Socket),
     Resp.
 
 % Delete
