@@ -21,3 +21,4 @@ The original client was heavily refactored, and most of it's code has gone.
 {ok, Msg} = epop_client:retrieve(Connection, <<"1">>).
 ok = epop_client:quit(Connection).
 ```
+*NOTE*: It's important to call epop_client:quit/1 at the end, as it's responsible for closing (tcp/tls) socket.
