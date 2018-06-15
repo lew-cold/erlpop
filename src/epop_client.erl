@@ -54,7 +54,7 @@ connect(User, Passwd, Options, Timeout) ->
         {error, Step, Reason, _State} ->
             error_logger:error_msg("Failed to establish connection. Reason: ~p", [Step]),
             % Force clean up to make sure that socket is closed
-            ok = cleanup(Connection),
+            cleanup(Connection),
             {error, Reason};
         {ok, _Conn} = Success -> Success
     end.
@@ -186,9 +186,9 @@ delete(_Connection, _MsgNum) -> {error, badarg}.
 % Utils functions
 
 % Helper for closing opened sockets
-cleanup(Connection = #connection{socket = undefined}) ->
+cleanup(_Connection = #connection{socket = undefined}) ->
     ok;
-cleanup(Connection = #connection{socket = Socket, protocol = Protocol}) ->
+cleanup(_Connection = #connection{socket = Socket, protocol = Protocol}) ->
     Protocol:close(Socket),
     ok.
 
