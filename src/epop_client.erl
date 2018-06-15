@@ -53,6 +53,8 @@ connect(User, Passwd, Options, Timeout) ->
     case epipe:run(ConnectionSteps, Connection) of
         {error, Step, Reason, _State} ->
             error_logger:error_msg("Failed to establish connection. Reason: ~p", [Step]),
+            % Force clean up to make sure that socket is closed
+            ok = cleanup(Connection),
             {error, Reason};
         {ok, _Conn} = Success -> Success
     end.
@@ -152,7 +154,7 @@ retrieve(_Connection, _MsgNum) -> {error, badarg}.
 -spec quit(Connection) -> Result when
     Connection :: connection(),
     Result     :: ok | {error, term()}.
-quit(Connection = #connection{protocol = Protocol, socket = Socket}) ->
+quit(Connection) ->
     send(Connection, <<"QUIT">>),
 
     Resp = case recv(Connection) of
@@ -162,7 +164,7 @@ quit(Connection = #connection{protocol = Protocol, socket = Socket}) ->
             ok;
         Err -> {error, Err}
     end,
-    Protocol:close(Socket),
+    cleanup(Connection),
     Resp.
 
 % Delete
@@ -182,6 +184,14 @@ delete(_Connection, _MsgNum) -> {error, badarg}.
 
 
 % Utils functions
+
+% Helper for closing opened sockets
+cleanup(Connection = #connection{socket = undefined}) ->
+    ok;
+cleanup(Connection = #connection{socket = Socket, protocol = Protocol}) ->
+    Protocol:close(Socket),
+    ok.
+
 
 % maybe_recv_ending(Connection, Data) when contains_end_octet(Data) == true -> {ok, Data};
 maybe_recv_ending(Connection, Data) ->
