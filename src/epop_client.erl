@@ -200,10 +200,10 @@ maybe_recv_ending(Connection, Data) ->
         false -> recv_ending(Connection, Data)
     end.
 
-recv_ending(Connection = #connection{protocol = Protocol, socket = Socket}, Data) ->
-    case Protocol:recv(Socket, 0) of
+recv_ending(Connection = #connection{protocol = Protocol, socket = Socket, timeout = Timeout}, Data) ->
+    case Protocol:recv(Socket, 0, Timeout) of
         {ok, NewData} -> maybe_recv_ending(Connection, <<Data/binary, NewData/binary>>);
-        Error         -> {error, Error}
+        Error        -> {error, Error}
     end.
 
 contains_end_octet(Data) ->
@@ -212,8 +212,8 @@ contains_end_octet(Data) ->
         _       -> true
     end.
 
-recv(_Meta = #connection{protocol = Protocol, socket = Socket}) ->
-    Protocol:recv(Socket, 0).
+recv(_Meta = #connection{protocol = Protocol, socket = Socket, timeout = Timeout}) ->
+    Protocol:recv(Socket, 0, Timeout).
 
 send(_Meta = #connection{protocol = Protocol, socket = Socket}, Msg) ->
     Protocol:send(Socket, <<Msg/binary, "\r\n">>).
