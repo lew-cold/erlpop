@@ -194,17 +194,18 @@ cleanup(_Connection = #connection{socket = Socket, protocol = Protocol}) ->
 
 
 % maybe_recv_ending(Connection, Data) when contains_end_octet(Data) == true -> {ok, Data};
+
 maybe_recv_ending(Connection, Data) ->
+    #connection{protocol = Protocol, socket = Socket, timeout = Timeout} = Connection,
     case contains_end_octet(Data) of
         true -> {ok, Data};
-        false -> recv_ending(Connection, Data)
+        false ->
+            case Protocol:recv(Socket, 0, Timeout) of
+                {ok, NewData} -> maybe_recv_ending(Connection, <<Data/binary, NewData/binary>>);
+                Error        -> {error, Error}
+            end
     end.
 
-recv_ending(Connection = #connection{protocol = Protocol, socket = Socket, timeout = Timeout}, Data) ->
-    case Protocol:recv(Socket, 0, Timeout) of
-        {ok, NewData} -> maybe_recv_ending(Connection, <<Data/binary, NewData/binary>>);
-        Error        -> {error, Error}
-    end.
 
 contains_end_octet(Data) ->
     case binary:match(Data, <<"\r\n.\r\n">>) of
