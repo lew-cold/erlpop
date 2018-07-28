@@ -30,6 +30,7 @@
     timeout=10000
 }).
 
+-define(END_BYTE_SIZE, 20).
 
 -type option()     :: addr | port | ssl.
 -type options()    :: {option(), string()} | option().
@@ -143,7 +144,7 @@ retrieve(Connection, MsgNum) when is_binary(MsgNum) ->
     send(Connection, <<"RETR ", MsgNum/binary>>),
 
     case recv(Connection) of
-        {ok, <<"+OK ", Data/binary>>}   -> maybe_recv_ending(Connection, reverse(Data));
+        {ok, <<"+OK ", Data/binary>>}   -> maybe_recv_ending(Connection, Data);
         {ok, <<"-ERR ", Error/binary>>} -> {error, Error};
         Error                           -> {error, Error}
     end;
@@ -193,16 +194,29 @@ cleanup(_Connection = #connection{socket = Socket, protocol = Protocol}) ->
     ok.
 
 
-% In order to optimize retrieval of multiline message, we reverse all messages and checking 
-% for reversed ending octet (original value: "\r\n.\r\n", reversed: "\n\r.\n\r")
-maybe_recv_ending(_Connection, <<"\n\r.\n\r", _Rest/binary>> = Data) -> {ok, reverse(Data)};
+maybe_recv_ending(Connection, {error, Reason} = Err) -> Err;
+
+maybe_recv_ending(Connection, Data) when byte_size(Data) < ?END_BYTE_SIZE ->
+    NewData = do_recv_ending(Connection, Data),
+    maybe_recv_ending(Connection, NewData);
+
 maybe_recv_ending(Connection, Data) ->
+    Offset = erlang:byte_size(Data) - ?END_BYTE_SIZE,
+    <<_Rest:Offset/binary, End/binary>> = Data,
+    case contains_end_octet(End) of
+        true -> 
+            {ok, Data};
+        false -> 
+            NewData = do_recv_ending(Connection, Data),
+            maybe_recv_ending(Connection, NewData)
+    end.
+
+
+do_recv_ending(Connection, Data) -> 
     #connection{protocol = Protocol, socket = Socket, timeout = Timeout} = Connection,
     case Protocol:recv(Socket, 0, Timeout) of
-        {ok, NewData} -> 
-            ReversedData = reverse(NewData),
-            maybe_recv_ending(Connection, <<ReversedData/binary, Data/binary>>);
-        Error -> {error, Error}
+        {ok, NewData} -> <<Data/binary, NewData/binary>>;
+        Error         -> {error, Error}
     end.
 
 recv(_Meta = #connection{protocol = Protocol, socket = Socket, timeout = Timeout}) ->
@@ -211,8 +225,9 @@ recv(_Meta = #connection{protocol = Protocol, socket = Socket, timeout = Timeout
 send(_Meta = #connection{protocol = Protocol, socket = Socket}, Msg) ->
     Protocol:send(Socket, <<Msg/binary, "\r\n">>).
 
-reverse(Binary) -> reverse(Binary, <<>>).
 
-reverse(<<>>, Acc) -> Acc;
-reverse(<<H:1/binary, Rest/binary>>, Acc) ->
-    reverse(Rest, <<H/binary, Acc/binary>>).
+contains_end_octet(Data) ->
+    case binary:match(Data, <<"\r\n.\r\n">>) of
+        nomatch -> false;
+        _       -> true
+    end.
