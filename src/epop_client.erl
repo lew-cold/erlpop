@@ -30,6 +30,7 @@
     timeout=10000
 }).
 
+-define(END_BYTE_SIZE, 20).
 
 -type option()     :: addr | port | ssl.
 -type options()    :: {option(), string()} | option().
@@ -193,24 +194,29 @@ cleanup(_Connection = #connection{socket = Socket, protocol = Protocol}) ->
     ok.
 
 
-% maybe_recv_ending(Connection, Data) when contains_end_octet(Data) == true -> {ok, Data};
+maybe_recv_ending(Connection, {error, Reason} = Err) -> Err;
+
+maybe_recv_ending(Connection, Data) when byte_size(Data) < ?END_BYTE_SIZE ->
+    NewData = do_recv_ending(Connection, Data),
+    maybe_recv_ending(Connection, NewData);
 
 maybe_recv_ending(Connection, Data) ->
-    #connection{protocol = Protocol, socket = Socket, timeout = Timeout} = Connection,
-    case contains_end_octet(Data) of
-        true -> {ok, Data};
-        false ->
-            case Protocol:recv(Socket, 0, Timeout) of
-                {ok, NewData} -> maybe_recv_ending(Connection, <<Data/binary, NewData/binary>>);
-                Error        -> {error, Error}
-            end
+    Offset = erlang:byte_size(Data) - ?END_BYTE_SIZE,
+    <<_Rest:Offset/binary, End/binary>> = Data,
+    case contains_end_octet(End) of
+        true -> 
+            {ok, Data};
+        false -> 
+            NewData = do_recv_ending(Connection, Data),
+            maybe_recv_ending(Connection, NewData)
     end.
 
 
-contains_end_octet(Data) ->
-    case binary:match(Data, <<"\r\n.\r\n">>) of
-        nomatch -> false;
-        _       -> true
+do_recv_ending(Connection, Data) -> 
+    #connection{protocol = Protocol, socket = Socket, timeout = Timeout} = Connection,
+    case Protocol:recv(Socket, 0, Timeout) of
+        {ok, NewData} -> <<Data/binary, NewData/binary>>;
+        Error         -> {error, Error}
     end.
 
 recv(_Meta = #connection{protocol = Protocol, socket = Socket, timeout = Timeout}) ->
@@ -218,3 +224,10 @@ recv(_Meta = #connection{protocol = Protocol, socket = Socket, timeout = Timeout
 
 send(_Meta = #connection{protocol = Protocol, socket = Socket}, Msg) ->
     Protocol:send(Socket, <<Msg/binary, "\r\n">>).
+
+
+contains_end_octet(Data) ->
+    case binary:match(Data, <<"\r\n.\r\n">>) of
+        nomatch -> false;
+        _       -> true
+    end.

@@ -77,6 +77,52 @@ multiline_commands_test_() ->
                     {error, {error, closed}},
                     epop_client:retrieve(Connection, <<"1">>)
                 )
-            end}
+            end},
+            {"Multiline for long messages", fun() -> 
+                meck:expect(gen_tcp, recv, fun(_, _, _) -> {ok, <<"+OK POP3 ready">>} end),
+                Opts = [{addr, "pop.gmail.com"}, {port, 995}],
+                {ok, Connection} = epop_client:connect("test@example.com", "foo", Opts, 1000),
+                Msgs = [{ok, <<"+OK Some">>}] ++ [{ok, <<"Some binary">>} || X <- lists:seq(1, 10000)] ++ [{ok, <<"\r\n.\r\n">>}],
+
+                Loop = meck:loop(Msgs),
+                meck:expect(gen_tcp, recv, 3, Loop),
+
+                FullMsg = lists:foldl(
+                    fun({ok, Msg}, Acc) -> <<Acc/binary, Msg/binary>> end,
+                    <<>>, Msgs
+                ),
+                <<"+OK ", ExpectedMsg/binary>> = FullMsg,
+                ?assertEqual(
+                    {ok, ExpectedMsg},
+                    epop_client:retrieve(Connection, <<"1">>)
+                )
+            end},
+            {"Multiline for long messages", {timeout, 90 ,fun() -> 
+                meck:expect(gen_tcp, recv, fun(_, _, _) -> {ok, <<"+OK POP3 ready">>} end),
+                Opts = [{addr, "pop.gmail.com"}, {port, 995}],
+                {ok, Connection} = epop_client:connect("test@example.com", "foo", Opts, 1000),
+
+                % Creating 1Kb chunk
+                Chunk = << <<"X">> || X <- lists:seq(1,  1 * 1000) >>,
+
+                % Generating a 10 Mb binary
+                Msgs = [{ok, <<"+OK Some">>}] ++ [{ok, Chunk} || _X <- lists:seq(1, 10 * 1000)] ++ [{ok, <<"\r\n.\r\n">>}],
+                Loop = meck:loop(Msgs),
+                meck:expect(gen_tcp, recv, 3, Loop),
+
+                FullMsg = lists:foldl(
+                    fun({ok, Msg}, Acc) -> <<Acc/binary, Msg/binary>> end,
+                    <<>>, Msgs
+                ),
+                <<"+OK ", ExpectedMsg/binary>> = FullMsg,
+                {Time, _} = timer:tc(fun() -> epop_client:retrieve(Connection, <<"1">>) end),
+                
+                % ?debugFmt("Call time large email: ~p", [Time])
+
+                % Entire processing time should not take more then 80 seconds
+                ?debugFmt("Time: ~p", [Time]),
+                ?assert(Time < 80 * 1000 * 1000)
+
+            end}}
         ]
     }.
